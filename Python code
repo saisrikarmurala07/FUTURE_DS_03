@@ -1,0 +1,87 @@
+# Install necessary packages
+!pip install vaderSentiment textblob wordcloud
+
+# Import libraries
+import pandas as pd
+import seaborn as sns
+import matplotlib.pyplot as plt
+from wordcloud import WordCloud
+from textblob import TextBlob
+from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
+from google.colab import files
+
+# Upload the Google Forms CSV
+uploaded = files.upload()
+
+# Load the uploaded CSV
+df = pd.read_csv(next(iter(uploaded)))
+
+# Clean column names
+df.columns = [col.strip().lower().replace(" ", "_") for col in df.columns]
+
+# Replace this with the actual column name from your form (open-text feedback column)
+feedback_col = 'what_did_you_like_or_dislike_about_the_event'
+
+# Drop empty feedback
+df = df.dropna(subset=[feedback_col])
+
+# Initialize VADER sentiment analyzer
+analyzer = SentimentIntensityAnalyzer()
+
+# Sentiment using VADER
+def get_sentiment_vader(text):
+    score = analyzer.polarity_scores(str(text))['compound']
+    if score >= 0.05:
+        return 'Positive'
+    elif score <= -0.05:
+        return 'Negative'
+    else:
+        return 'Neutral'
+
+df['sentiment_vader'] = df[feedback_col].apply(get_sentiment_vader)
+
+# Sentiment using TextBlob
+def get_sentiment_textblob(text):
+    polarity = TextBlob(str(text)).sentiment.polarity
+    if polarity > 0:
+        return 'Positive'
+    elif polarity < 0:
+        return 'Negative'
+    else:
+        return 'Neutral'
+
+df['sentiment_textblob'] = df[feedback_col].apply(get_sentiment_textblob)
+
+# Visualization - VADER Sentiment Distribution
+plt.figure(figsize=(6, 4))
+sns.countplot(data=df, x='sentiment_vader', palette='Set2')
+plt.title('VADER Sentiment Distribution')
+plt.xlabel('Sentiment')
+plt.ylabel('Count')
+plt.show()
+
+# Visualization - TextBlob Sentiment Distribution
+plt.figure(figsize=(6, 4))
+sns.countplot(data=df, x='sentiment_textblob', palette='Set3')
+plt.title('TextBlob Sentiment Distribution')
+plt.xlabel('Sentiment')
+plt.ylabel('Count')
+plt.show()
+
+# Word Cloud from all feedback
+all_feedback = ' '.join(df[feedback_col].astype(str))
+wordcloud = WordCloud(width=1000, height=500, background_color='white').generate(all_feedback)
+
+plt.figure(figsize=(10, 5))
+plt.imshow(wordcloud, interpolation='bilinear')
+plt.axis('off')
+plt.title('Word Cloud of Feedback Comments')
+plt.show()
+
+# Show sample negative feedback (VADER-based)
+print("\n🔍 Sample Negative Feedback (VADER):\n")
+print(df[df['sentiment_vader'] == 'Negative'][feedback_col].sample(min(5, len(df[df['sentiment_vader'] == 'Negative']))))
+
+# Show sample positive feedback (VADER-based)
+print("\n🎉 Sample Positive Feedback (VADER):\n")
+print(df[df['sentiment_vader'] == 'Positive'][feedback_col].sample(min(5, len(df[df['sentiment_vader'] == 'Positive']))))
